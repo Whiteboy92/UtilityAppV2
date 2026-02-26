@@ -1,0 +1,49 @@
+﻿<Window x:Class="UtilityAppV2.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:convert="clr-namespace:UtilityAppV2.Views.ConvertToPngView"
+        xmlns:download="clr-namespace:UtilityAppV2.Views.DownloadPlaylistView"
+        xmlns:fix="clr-namespace:UtilityAppV2.Views.FixFileNamesView"
+        xmlns:move="clr-namespace:UtilityAppV2.Views.MoveFilesView"
+        xmlns:titleBar="clr-namespace:UtilityAppV2.UI_Components.TitleBar"
+        Title="UtilityAppV2"
+        Height="720"
+        Width="1280"
+        WindowStyle="None"
+        ResizeMode="CanResize"
+        AllowsTransparency="False"
+        Background="#202020"
+        ShowInTaskbar="True"
+        SnapsToDevicePixels="True"
+        BorderBrush="#333333"
+        BorderThickness="2"
+        WindowStartupLocation="CenterScreen">
+
+    <!-- THIS REMOVES DEFAULT CHROME AND SHADOW -->
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="32" 
+                      ResizeBorderThickness="5" 
+                      GlassFrameThickness="0"
+                      CornerRadius="0" />
+    </WindowChrome.WindowChrome>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="32"/>   <!-- Custom title bar -->
+            <RowDefinition Height="*"/>    <!-- Content -->
+        </Grid.RowDefinitions>
+
+        <!-- CUSTOM TITLE BAR -->
+        <titleBar:CustomTitleBar Grid.Row="0" WindowTitle="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}" />
+
+        <!-- MAIN CONTENT -->
+        <ScrollViewer Grid.Row="1" Background="#202020">
+            <StackPanel Margin="20" VerticalAlignment="Top">
+                <convert:ConvertToPngView />
+                <download:DownloadPlaylistView />
+                <fix:FixFileNamesView />
+                <move:MoveFilesView />
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Window>

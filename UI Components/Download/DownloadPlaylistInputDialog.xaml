@@ -1,0 +1,54 @@
+﻿<Window x:Class="UtilityAppV2.UI_Components.Download.DownloadPlaylistInputDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        xmlns:titleBar="clr-namespace:UtilityAppV2.UI_Components.TitleBar"
+        Title="Download Playlist"
+        Height="300" Width="450"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        WindowStyle="None"
+        Background="#202020"
+        BorderBrush="#333333"
+        BorderThickness="2">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="32"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Custom Title Bar -->
+        <titleBar:CustomTitleBar Grid.Row="0"
+                                WindowTitle="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}" />
+
+        <!-- Content -->
+        <Grid Grid.Row="1" Margin="10">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/> <!-- URL label -->
+                <RowDefinition Height="Auto"/> <!-- URL textbox -->
+                <RowDefinition Height="10"/>  <!-- spacing -->
+                <RowDefinition Height="Auto"/> <!-- Num label -->
+                <RowDefinition Height="Auto"/> <!-- Num textbox -->
+                <RowDefinition Height="10"/>  <!-- spacing -->
+                <RowDefinition Height="Auto"/> <!-- First song label -->
+                <RowDefinition Height="10"/> <!-- spacing -->
+                <RowDefinition Height="Auto"/> <!-- Buttons -->
+            </Grid.RowDefinitions>
+
+            <ui:TextBlock Grid.Row="0" Text="Playlist URL:" Foreground="White"/>
+            <TextBox Grid.Row="1" x:Name="PlayListUrlTb" Text="{Binding PlaylistUrl, UpdateSourceTrigger=PropertyChanged}" Margin="0,5,0,5"/>
+
+            <TextBlock Grid.Row="3" Text="Number of songs:" Foreground="White"/>
+            <TextBox Grid.Row="4" x:Name="NumberOfSongsTb" Text="{Binding NumberOfSongs, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" Margin="0,5,0,5"/>
+
+            <TextBlock Grid.Row="6" Foreground="White"
+                       Text="{Binding FirstDownloadedSong, StringFormat=Last song: {0}}" />
+
+            <StackPanel Grid.Row="8" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+                <Button Content="OK" Width="75" Margin="5" Click="Ok_Click"/>
+                <Button Content="Cancel" Width="75" Margin="5" Click="Cancel_Click"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>
