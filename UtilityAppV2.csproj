@@ -10,55 +10,64 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <PackageReference Include="Magick.NET-Q8-x64" Version="14.9.1" />
-      <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
-      <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" />
-      <PackageReference Include="Ookii.Dialogs.Wpf" Version="5.0.1" />
-      <PackageReference Include="TagLibSharp" Version="2.3.0" />
-      <PackageReference Include="WPF-UI" Version="4.1.0" />
+        <PackageReference Include="Magick.NET-Q8-x64" Version="14.9.1" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" />
+        <PackageReference Include="Ookii.Dialogs.Wpf" Version="5.0.1" />
+        <PackageReference Include="TagLibSharp" Version="2.3.0" />
+        <PackageReference Include="WPF-UI" Version="4.1.0" />
     </ItemGroup>
 
     <ItemGroup>
-      <Page Update="Views\DownloadPlaylistView\DownloadPlaylistView.xaml">
-        <Generator>MSBuild:Compile</Generator>
-        <XamlRuntime>Wpf</XamlRuntime>
-        <SubType>Designer</SubType>
-      </Page>
-      <Page Update="Views\FixNamesView\FixFileNamesView.xaml">
-        <Generator>MSBuild:Compile</Generator>
-        <XamlRuntime>Wpf</XamlRuntime>
-        <SubType>Designer</SubType>
-      </Page>
-      <Page Update="Views\MoveFilesView\MoveFilesView.xaml">
-        <Generator>MSBuild:Compile</Generator>
-        <XamlRuntime>Wpf</XamlRuntime>
-        <SubType>Designer</SubType>
-      </Page>
+        <Page Update="Views\DownloadPlaylistView\DownloadPlaylistView.xaml">
+            <Generator>MSBuild:Compile</Generator>
+            <XamlRuntime>Wpf</XamlRuntime>
+            <SubType>Designer</SubType>
+        </Page>
+        <Page Update="Views\FixNamesView\FixFileNamesView.xaml">
+            <Generator>MSBuild:Compile</Generator>
+            <XamlRuntime>Wpf</XamlRuntime>
+            <SubType>Designer</SubType>
+        </Page>
+        <Page Update="Views\MoveFilesView\MoveFilesView.xaml">
+            <Generator>MSBuild:Compile</Generator>
+            <XamlRuntime>Wpf</XamlRuntime>
+            <SubType>Designer</SubType>
+        </Page>
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="UI Components\MsgBox\" />
-      <Folder Include="UI Components\Resources\" />
+        <Folder Include="UI Components\MsgBox\" />
+        <Folder Include="UI Components\Resources\" />
     </ItemGroup>
 
     <ItemGroup>
-      <None Remove="UI Components\TitleBar\Icons\Close.png" />
-      <Resource Include="UI Components\TitleBar\Icons\Close.png" />
-      <None Remove="UI Components\TitleBar\Icons\Maximize.png" />
-      <Resource Include="UI Components\TitleBar\Icons\Maximize.png" />
-      <None Remove="UI Components\TitleBar\Icons\Minimize.png" />
-      <Resource Include="UI Components\TitleBar\Icons\Minimize.png" />
-      <None Remove="Resources\Icons\UtilityAppV2Icon.ico" />
-      <None Update="Resources\Tools\ffmpeg.exe">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </None>
-      <None Update="Resources\Tools\ffprobe.exe">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </None>
+        <None Remove="UI Components\TitleBar\Icons\Close.png" />
+        <Resource Include="UI Components\TitleBar\Icons\Close.png" />
+        <None Remove="UI Components\TitleBar\Icons\Maximize.png" />
+        <Resource Include="UI Components\TitleBar\Icons\Maximize.png" />
+        <None Remove="UI Components\TitleBar\Icons\Minimize.png" />
+        <Resource Include="UI Components\TitleBar\Icons\Minimize.png" />
+        <None Remove="Resources\Icons\UtilityAppV2Icon.ico" />
+        <None Update="Resources\Tools\ffmpeg.exe">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Update="Resources\Tools\ffprobe.exe">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Update="Resources\Tools\ffplay.exe">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Update="Resources\Tools\yt-dlp.exe">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Update="Resources\Icons\UtilityAppV2Icon.ico">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
     </ItemGroup>
 
     <ItemGroup>
-      <Resource Include="Resources\Icons\UtilityAppV2Icon.ico" />
+        <Resource Include="Resources\Icons\UtilityAppV2Icon.ico" />
     </ItemGroup>
 
 </Project>
