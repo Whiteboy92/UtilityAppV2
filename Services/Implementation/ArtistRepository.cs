@@ -1,55 +1,32 @@
-﻿using System.IO;
+using System.IO;
 using UtilityAppV2.Core;
+using UtilityAppV2.Helpers;
 using UtilityAppV2.Services.Interfaces;
 
 namespace UtilityAppV2.Services.Implementation;
 
 public class ArtistRepository : IArtistRepository
 {
-    private List<string>? cachedArtists;
     private readonly Lock syncRoot = new();
+    private IReadOnlyList<string>? cachedArtists;
 
-    public Task<List<string>> LoadArtistsAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<string>> LoadArtistsAsync(CancellationToken cancellationToken = default)
     {
+        var cached = Volatile.Read(ref cachedArtists);
+        if (cached is not null)
+            return cached;
+
+        // Scan the disk off the lock so concurrent callers never block on I/O.
+        var scanned = await Task.Run(() => ScanArtists(cancellationToken), cancellationToken);
+
         lock (syncRoot)
         {
-            if (cachedArtists != null)
-            {
-                return Task.FromResult(cachedArtists);
-            }
-
-            string dbFolder = FilePathConstants.MusicDbFolder;
-            if (!Directory.Exists(dbFolder))
-            {
-                cachedArtists = [];
-                return Task.FromResult(cachedArtists);
-            }
-
-            var files = Directory.GetFiles(dbFolder);
-            var artists = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            foreach (var f in files)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                string name = Path.GetFileNameWithoutExtension(f).Trim();
-                int idx = name.LastIndexOf('-');
-                if (idx > 0)
-                {
-                    string artistPart = name[(idx + 1)..].Trim();
-                    if (!string.IsNullOrWhiteSpace(artistPart))
-                    {
-                        artists.Add(artistPart);
-                    }
-                }
-            }
-
-            cachedArtists = artists.OrderBy(a => a).ToList();
-            return Task.FromResult(cachedArtists);
+            cachedArtists ??= scanned;
+            return cachedArtists;
         }
     }
 
-    public bool ArtistExists(string name, List<string> artists)
+    public bool ArtistExists(string name, IReadOnlyList<string> artists)
     {
         return artists.Any(a => a.Equals(name, StringComparison.OrdinalIgnoreCase));
     }
@@ -60,5 +37,28 @@ public class ArtistRepository : IArtistRepository
         {
             cachedArtists = null;
         }
+    }
+
+    private static IReadOnlyList<string> ScanArtists(CancellationToken cancellationToken)
+    {
+        string dbFolder = FilePathConstants.MusicDbFolder;
+        if (!Directory.Exists(dbFolder))
+            return [];
+
+        var artists = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var f in Directory.GetFiles(dbFolder))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            string name = Path.GetFileNameWithoutExtension(f);
+
+            // Files are named "Song - Artist"; take the artist segment.
+            var (_, artistPart) = FileNameParser.SplitSongArtist(name);
+            if (!string.IsNullOrWhiteSpace(artistPart))
+                artists.Add(artistPart);
+        }
+
+        return artists.OrderBy(a => a).ToArray();
     }
 }

@@ -14,31 +14,18 @@ public class DownloadPlaylistInputDialogViewModel : BaseViewModel
     public string? PlaylistUrl
     {
         get;
-        set
-        {
-            field = value;
-            OnPropertyChanged();
-        }
+        set => SetProperty(ref field, value);
     }
 
     public int NumberOfSongs
     {
         get;
-        set
-        {
-            field = value;
-            OnPropertyChanged();
-        }
+        set => SetProperty(ref field, value);
     } = 1;
-
 
     public string? FirstDownloadedSong
     {
         get;
-        set
-        {
-            field = value;
-            OnPropertyChanged();
-        }
+        set => SetProperty(ref field, value);
     }
 }

@@ -1,13 +1,12 @@
-﻿using Microsoft.Extensions.DependencyInjection;
 using UtilityAppV2.ViewModels;
 
 namespace UtilityAppV2.Views.ConvertToPngView;
 
 public partial class ConvertToPngView
 {
-    public ConvertToPngView()
+    public ConvertToPngView(ConvertToPngViewModel viewModel)
     {
         InitializeComponent();
-        DataContext = App.ServiceProvider.GetRequiredService<ConvertToPngViewModel>();
+        DataContext = viewModel;
     }
 }

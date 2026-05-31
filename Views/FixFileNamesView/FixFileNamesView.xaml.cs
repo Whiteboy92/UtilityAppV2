@@ -1,13 +1,12 @@
-﻿using Microsoft.Extensions.DependencyInjection;
 using UtilityAppV2.ViewModels;
 
 namespace UtilityAppV2.Views.FixFileNamesView;
 
 public partial class FixFileNamesView
 {
-    public FixFileNamesView()
+    public FixFileNamesView(FixFileNamesViewModel viewModel)
     {
         InitializeComponent();
-        DataContext = App.ServiceProvider.GetRequiredService<FixFileNamesViewModel>();
+        DataContext = viewModel;
     }
 }

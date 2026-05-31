@@ -1,7 +1,8 @@
-﻿namespace UtilityAppV2.Services.Interfaces;
+namespace UtilityAppV2.Services.Interfaces;
 
 public interface IArtistRepository
 {
-    Task<List<string>> LoadArtistsAsync(CancellationToken cancellationToken = default);
-    bool ArtistExists(string name, List<string> artists);
+    Task<IReadOnlyList<string>> LoadArtistsAsync(CancellationToken cancellationToken = default);
+    bool ArtistExists(string name, IReadOnlyList<string> artists);
+    void InvalidateCache();
 }

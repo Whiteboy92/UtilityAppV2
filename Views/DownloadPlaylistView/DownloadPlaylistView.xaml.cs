@@ -1,13 +1,14 @@
-﻿using Microsoft.Extensions.DependencyInjection;
 using UtilityAppV2.ViewModels;
 
 namespace UtilityAppV2.Views.DownloadPlaylistView;
 
 public partial class DownloadPlaylistView
 {
-    public DownloadPlaylistView()
+    public DownloadPlaylistView(DownloadPlaylistViewModel viewModel)
     {
         InitializeComponent();
-        DataContext = App.ServiceProvider.GetRequiredService<DownloadPlaylistViewModel>();
+        DataContext = viewModel;
+
+        Loaded += async (_, _) => await viewModel.InitializeAsync();
     }
 }

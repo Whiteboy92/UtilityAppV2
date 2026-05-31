@@ -1,6 +1,4 @@
-﻿using System.Windows;
 using System.Windows.Input;
-using Ookii.Dialogs.Wpf;
 using UtilityAppV2.Commands;
 using UtilityAppV2.Core;
 using UtilityAppV2.Models;
@@ -11,16 +9,13 @@ namespace UtilityAppV2.ViewModels;
 public class ConvertToPngViewModel : BaseViewModel
 {
     private readonly IFileConversionService fileConversionService;
+    private readonly IDialogService dialogService;
     private CancellationTokenSource? cancellationTokenSource;
 
     public double Progress
     {
         get;
-        set
-        {
-            field = value;
-            OnPropertyChanged();
-        }
+        set => SetProperty(ref field, value);
     }
 
     private bool IsProcessing
@@ -28,8 +23,7 @@ public class ConvertToPngViewModel : BaseViewModel
         get;
         set
         {
-            field = value;
-            OnPropertyChanged();
+            if (!SetProperty(ref field, value)) return;
             ((RelayCommand)ConvertCommand).RaiseCanExecuteChanged();
             ((RelayCommand)CancelCommand).RaiseCanExecuteChanged();
         }
@@ -38,73 +32,53 @@ public class ConvertToPngViewModel : BaseViewModel
     public ICommand ConvertCommand { get; }
     public ICommand CancelCommand { get; }
 
-    public ConvertToPngViewModel(IFileConversionService fileConversionService)
+    public ConvertToPngViewModel(IFileConversionService fileConversionService, IDialogService dialogService)
     {
         this.fileConversionService = fileConversionService ?? throw new ArgumentNullException(nameof(fileConversionService));
+        this.dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
 
-        ConvertCommand = new RelayCommand(async void (_) =>
-        {
-            try
-            {
-                await ConvertFilesAsync();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(
-                    $"An unexpected error occurred:\n{ex.Message}",
-                    "Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error
-                );
-            }
-        }, _ => !IsProcessing);
-
+        ConvertCommand = new RelayCommand(_ => _ = ConvertFilesAsync(), _ => !IsProcessing);
         CancelCommand = new RelayCommand(_ => CancelConversion(), _ => IsProcessing);
     }
 
     private async Task ConvertFilesAsync()
     {
+        string? folder = dialogService.PickFolder("Select folder to convert");
+        if (folder is null)
+            return;
+
+        IsProcessing = true;
+        Progress = 0;
+        cancellationTokenSource = new CancellationTokenSource();
+
         try
         {
-            var dialog = new VistaFolderBrowserDialog();
-            if (dialog.ShowDialog() != true)
-                return;
-
-            string folder = dialog.SelectedPath;
-
-            IsProcessing = true;
-            Progress = 0;
-
-            cancellationTokenSource = new CancellationTokenSource();
             var progressReporter = new Progress<double>(p => Progress = p);
 
             ConversionResult result = await fileConversionService.ConvertFilesToPngAsync(
                 folder,
                 progressReporter,
-                cancellationTokenSource.Token
-            );
+                cancellationTokenSource.Token);
 
-            MessageBox.Show(
-                $"Conversion completed successfully!\n\n" +
+            dialogService.ShowInfo(
+                "Conversion completed successfully!\n\n" +
                 $"Total files: {result.TotalFiles}\n" +
                 $"Converted: {result.ConvertedFiles}\n" +
                 $"Duration: {result.Duration.TotalSeconds:F2} seconds",
-                "Success",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information
-            );
+                "Success");
         }
         catch (OperationCanceledException)
         {
-            MessageBox.Show("Conversion was canceled.", "Canceled", MessageBoxButton.OK, MessageBoxImage.Warning);
+            dialogService.ShowWarning("Conversion was canceled.", "Canceled");
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Error during conversion:\n{ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            dialogService.ShowError($"Error during conversion:\n{ex.Message}");
         }
         finally
         {
             IsProcessing = false;
+            Progress = 0;
             cancellationTokenSource?.Dispose();
             cancellationTokenSource = null;
         }

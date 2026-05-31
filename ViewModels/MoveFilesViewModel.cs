@@ -1,4 +1,3 @@
-﻿using System.Windows;
 using System.Windows.Input;
 using UtilityAppV2.Commands;
 using UtilityAppV2.Core;
@@ -10,55 +9,40 @@ namespace UtilityAppV2.ViewModels
     public class MoveFilesViewModel : BaseViewModel
     {
         private readonly IMoveFilesService moveFilesService;
+        private readonly IDialogService dialogService;
 
         private CancellationTokenSource? cts;
 
-        public MoveFilesViewModel(IMoveFilesService moveFilesService)
+        public MoveFilesViewModel(IMoveFilesService moveFilesService, IDialogService dialogService)
         {
             this.moveFilesService = moveFilesService ?? throw new ArgumentNullException(nameof(moveFilesService));
+            this.dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
 
-            MoveCommand = new RelayCommand(_ => RunMoveFilesAsync(), _ => !IsMoving);
+            MoveCommand = new RelayCommand(_ => _ = RunMoveFilesAsync(), _ => !IsMoving);
             CancelCommand = new RelayCommand(_ => CancelMove(), _ => IsMoving);
         }
 
-        // ====================
-        // Properties
-        // ====================
-
         public double Progress
         {
-            get { return field; }
-            set
-            {
-                field = value;
-                OnPropertyChanged();
-            }
+            get;
+            set => SetProperty(ref field, value);
         }
 
         public bool IsMoving
         {
-            get { return field; }
+            get;
             set
             {
-                field = value;
-                OnPropertyChanged();
+                if (!SetProperty(ref field, value)) return;
                 ((RelayCommand)MoveCommand).RaiseCanExecuteChanged();
                 ((RelayCommand)CancelCommand).RaiseCanExecuteChanged();
             }
         }
 
-        // ====================
-        // Commands
-        // ====================
-
         public ICommand MoveCommand { get; }
         public ICommand CancelCommand { get; }
 
-        // ====================
-        // Methods
-        // ====================
-
-        private async void RunMoveFilesAsync()
+        private async Task RunMoveFilesAsync()
         {
             try
             {
@@ -66,11 +50,9 @@ namespace UtilityAppV2.ViewModels
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
+                dialogService.ShowError(
                     "An error occurred while moving files:\n" + ex.Message,
-                    "Move Files Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                    "Move Files Error");
             }
         }
 
@@ -87,50 +69,50 @@ namespace UtilityAppV2.ViewModels
                     Progress = Math.Max(0, Math.Min(100, value));
                 });
 
-                FileMoveResult result = await moveFilesService.MoveFilesAsync(
-                    progressReporter,
-                    cts.Token);
+                FileMoveResult result = await moveFilesService.MoveFilesAsync(progressReporter, cts.Token);
+
+                if (result.Aborted)
+                {
+                    dialogService.ShowError(result.ErrorMessage!, "Move Files");
+                    return;
+                }
+
+                if (result.TagErrors.Count > 0)
+                {
+                    dialogService.ShowWarning(
+                        "Some files could not be tagged:\n\n" +
+                        string.Join(Environment.NewLine, result.TagErrors.Take(10)),
+                        "Tag Update Warning");
+                }
 
                 if (result.MovedFiles > 0)
                 {
-                    MessageBox.Show(
+                    dialogService.ShowInfo(
                         "Files moved successfully!\n" +
                         "From: " + FilePathConstants.PlaylistFolder + "\n" +
                         "To: " + FilePathConstants.MusicDbFolder + "\n\n" +
                         "Total files: " + result.TotalFiles + "\n" +
                         "Moved files: " + result.MovedFiles,
-                        "Move Files",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Information);
+                        "Move Files");
                 }
             }
             catch (OperationCanceledException)
             {
-                MessageBox.Show(
-                    "Move operation was canceled.",
-                    "Canceled",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                dialogService.ShowWarning("Move operation was canceled.", "Canceled");
             }
             finally
             {
                 IsMoving = false;
                 Progress = 0;
-
-                if (cts != null)
-                {
-                    cts.Dispose();
-                    cts = null;
-                }
+                cts?.Dispose();
+                cts = null;
             }
         }
 
         private void CancelMove()
         {
             if (cts is { IsCancellationRequested: false })
-            {
                 cts.Cancel();
-            }
         }
     }
 }

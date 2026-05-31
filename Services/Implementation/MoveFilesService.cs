@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using UtilityAppV2.Core;
 using UtilityAppV2.Helpers;
 using UtilityAppV2.Models;
@@ -18,15 +18,8 @@ namespace UtilityAppV2.Services.Implementation
             var startTime = DateTime.UtcNow;
 
             // 1. Validate source folder
-            if (!ValidationHelper.ValidateSourceFolder(sourceFolder))
-            {
-                return new FileMoveResult
-                {
-                    TotalFiles = 0,
-                    MovedFiles = 0,
-                    Duration = TimeSpan.Zero,
-                };
-            }
+            if (!ValidationHelper.ValidateSourceFolder(sourceFolder, out string? sourceError))
+                return Aborted(0, startTime, sourceError);
 
             Directory.CreateDirectory(destinationFolder);
 
@@ -48,59 +41,64 @@ namespace UtilityAppV2.Services.Implementation
             }
 
             // 3. Validate names: Unknown Artist
-            if (!ValidationHelper.EnsureNoUnknownArtist(files, totalFiles, startTime, out FileMoveResult? unknownArtistResult))
-            {
-                return unknownArtistResult ?? throw new InvalidOperationException();
-            }
+            if (!ValidationHelper.EnsureNoUnknownArtist(files, out string? unknownError))
+                return Aborted(totalFiles, startTime, unknownError);
 
             // 4. Validate duplicates (in source and against destination)
-            if (!ValidationHelper.EnsureNoDuplicates(files, destinationFolder, totalFiles, startTime, out var duplicatesResult))
-            {
-                return duplicatesResult ?? throw new InvalidOperationException();
-            }
+            if (!ValidationHelper.EnsureNoDuplicates(files, destinationFolder, out string? duplicateError))
+                return Aborted(totalFiles, startTime, duplicateError);
 
-            // 5. Move files
-            int movedFiles = await MoveFilesCoreAsync(files, destinationFolder, progress, cancellationToken);
+            // 5. Move files (off the UI thread)
+            var movedFiles = await Task.Run(
+                () => MoveFilesCore(files, destinationFolder, progress, cancellationToken),
+                cancellationToken);
 
-            // 6. Tag all audio files in destination
-            await TagProcessingHelper.ProcessTagsAsync(destinationFolder, cancellationToken);
-
-            var duration = DateTime.UtcNow - startTime;
+            // 6. Re-tag the whole destination so track numbers stay unique and
+            //    sequential across the entire library (not just this batch).
+            var destinationFiles = FileSystemHelper.GetAllFilesFromFolder(destinationFolder);
+            var tagErrors = await TagProcessingHelper.ProcessTagsAsync(destinationFiles, cancellationToken);
 
             return new FileMoveResult
             {
                 TotalFiles = totalFiles,
-                MovedFiles = movedFiles,
-                Duration = duration,
+                MovedFiles = movedFiles.Count,
+                Duration = DateTime.UtcNow - startTime,
+                TagErrors = tagErrors,
             };
         }
 
-        private async Task<int> MoveFilesCoreAsync(
+        private static List<string> MoveFilesCore(
             string[] files,
             string destinationFolder,
             IProgress<double>? progress,
             CancellationToken cancellationToken)
         {
             int totalFiles = files.Length;
-            int movedFiles = 0;
+            var moved = new List<string>(totalFiles);
 
             for (int i = 0; i < totalFiles; i++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
                 string sourceFile = files[i];
-                string fileName = Path.GetFileName(sourceFile);
-                string destinationFile = Path.Combine(destinationFolder, fileName);
+                string destinationFile = Path.Combine(destinationFolder, Path.GetFileName(sourceFile));
 
                 File.Move(sourceFile, destinationFile, overwrite: false);
-                movedFiles++;
+                moved.Add(destinationFile);
 
-                progress?.Report((movedFiles * 100.0) / totalFiles);
-
-                await Task.Yield();
+                progress?.Report((moved.Count * 100.0) / totalFiles);
             }
 
-            return movedFiles;
+            return moved;
         }
+
+        private static FileMoveResult Aborted(int totalFiles, DateTime startTime, string? error) =>
+            new()
+            {
+                TotalFiles = totalFiles,
+                MovedFiles = 0,
+                Duration = DateTime.UtcNow - startTime,
+                ErrorMessage = error,
+            };
     }
 }

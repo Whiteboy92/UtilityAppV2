@@ -1,4 +1,4 @@
-﻿using System.Windows;
+using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using UtilityAppV2.Services.Implementation;
 using UtilityAppV2.Services.Interfaces;
@@ -12,35 +12,39 @@ namespace UtilityAppV2;
 
 public partial class App
 {
-    public static ServiceProvider ServiceProvider { get; private set; } = null!;
+    private ServiceProvider? serviceProvider;
 
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
 
-        // Configure services
         var serviceCollection = new ServiceCollection();
         ConfigureServices(serviceCollection);
 
-        ServiceProvider = serviceCollection.BuildServiceProvider();
+        serviceProvider = serviceCollection.BuildServiceProvider();
 
-        // Show the main window
-        var mainWindow = ServiceProvider.GetRequiredService<MainWindow>();
+        var mainWindow = serviceProvider.GetRequiredService<MainWindow>();
         mainWindow.Show();
     }
 
-    private void ConfigureServices(IServiceCollection services)
+    protected override void OnExit(ExitEventArgs e)
+    {
+        serviceProvider?.Dispose();
+        base.OnExit(e);
+    }
+
+    private static void ConfigureServices(IServiceCollection services)
     {
         // Services
         services.AddSingleton<ISettingsService, SettingsService>();
         services.AddSingleton<IDialogService, DialogService>();
         services.AddSingleton<IFileConversionService, FileConversionService>();
-        services.AddSingleton<IDownloadService, DownloadService>(); 
+        services.AddSingleton<IDownloadService, DownloadService>();
         services.AddSingleton<IFileFixerService, FileFixerService>();
         services.AddSingleton<IRegexFileNameCleaner, RegexFileNameCleaner>();
         services.AddSingleton<IMoveFilesService, MoveFilesService>();
         services.AddSingleton<IArtistRepository, ArtistRepository>();
-        
+
         // ViewModels
         services.AddTransient<ConvertToPngViewModel>();
         services.AddTransient<DownloadPlaylistViewModel>();

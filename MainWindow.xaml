@@ -1,10 +1,6 @@
 ﻿<Window x:Class="UtilityAppV2.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:convert="clr-namespace:UtilityAppV2.Views.ConvertToPngView"
-        xmlns:download="clr-namespace:UtilityAppV2.Views.DownloadPlaylistView"
-        xmlns:fix="clr-namespace:UtilityAppV2.Views.FixFileNamesView"
-        xmlns:move="clr-namespace:UtilityAppV2.Views.MoveFilesView"
         xmlns:titleBar="clr-namespace:UtilityAppV2.UI_Components.TitleBar"
         Title="UtilityAppV2"
         Height="720"
@@ -39,10 +35,10 @@
         <!-- MAIN CONTENT -->
         <ScrollViewer Grid.Row="1" Background="#202020">
             <StackPanel Margin="20" VerticalAlignment="Top">
-                <convert:ConvertToPngView />
-                <download:DownloadPlaylistView />
-                <fix:FixFileNamesView />
-                <move:MoveFilesView />
+                <ContentControl x:Name="ConvertHost" />
+                <ContentControl x:Name="DownloadHost" />
+                <ContentControl x:Name="FixHost" />
+                <ContentControl x:Name="MoveHost" />
             </StackPanel>
         </ScrollViewer>
     </Grid>

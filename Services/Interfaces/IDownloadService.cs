@@ -1,5 +1,4 @@
-﻿using UtilityAppV2.Models;
-using UtilityAppV2.Settings;
+using UtilityAppV2.Models;
 
 namespace UtilityAppV2.Services.Interfaces
 {
@@ -9,8 +8,7 @@ namespace UtilityAppV2.Services.Interfaces
             string playlistUrl,
             int numberOfSongs,
             string downloadFolder,
-            IProgress<(int downloaded, int total, string currentSong)> progress,
-            CancellationToken cancellationToken,
-            UserSettings userSettings);
+            IProgress<(int downloaded, int total, string currentSong)>? progress,
+            CancellationToken cancellationToken);
     }
 }
