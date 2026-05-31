@@ -1,4 +1,5 @@
-﻿using System.Globalization;
+using System.Globalization;
+using System.IO;
 using UtilityAppV2.Core;
 using UtilityAppV2.Helpers;
 using UtilityAppV2.Models;
@@ -33,6 +34,31 @@ public class FileFixerService(
             .ToList();
 
         int total = playlistFiles.Count;
+
+        // Run file I/O off the UI thread to keep the app responsive.
+        var (processed, renamed) = await Task.Run(
+            () => FixCore(playlistFiles, artistList, progress, cancellationToken),
+            cancellationToken);
+
+        stopwatch.Stop();
+
+        return new FileFixResult
+        {
+            TotalFiles = total,
+            ProcessedFiles = processed,
+            RenamedFiles = renamed,
+            Duration = stopwatch.Elapsed,
+        };
+    }
+
+    private (int Processed, int Renamed) FixCore(
+        List<string> playlistFiles,
+        IReadOnlyList<string> artistList,
+        IProgress<double>? progress,
+        CancellationToken cancellationToken)
+    {
+        int total = playlistFiles.Count;
+        int attempted = 0;
         int processed = 0;
         int renamed = 0;
 
@@ -47,9 +73,13 @@ public class FileFixerService(
                 if (!string.Equals(file, newPath, StringComparison.OrdinalIgnoreCase))
                 {
                     newPath = FileSystemHelper.GetUniqueFilePath(newPath);
-                    System.IO.File.Move(file, newPath);
+                    File.Move(file, newPath);
                     renamed++;
                 }
+
+                // Only count files we actually handled (renamed or correctly left as-is);
+                // files that threw are skipped and excluded from the processed total.
+                processed++;
             }
             catch (OperationCanceledException)
             {
@@ -61,49 +91,33 @@ public class FileFixerService(
             }
             finally
             {
-                processed++;
-                if (total > 0)
-                {
-                    double percent = (processed * 100.0) / Math.Max(1, total);
-                    progress?.Report(percent);
-                }
-                else
-                {
-                    progress?.Report(100.0);
-                }
+                attempted++;
+                progress?.Report(total > 0 ? (attempted * 100.0) / total : 100.0);
             }
         }
 
-        stopwatch.Stop();
-
-        return new FileFixResult
-        {
-            TotalFiles = total,
-            ProcessedFiles = processed,
-            RenamedFiles = renamed,
-            Duration = stopwatch.Elapsed,
-        };
+        return (processed, renamed);
     }
 
-    private string GetRenamedFilePath(string filePath, List<string> artistList)
+    private string GetRenamedFilePath(string filePath, IReadOnlyList<string> artistList)
     {
-        string ext = System.IO.Path.GetExtension(filePath);
-        string baseName = System.IO.Path.GetFileNameWithoutExtension(filePath);
+        string ext = Path.GetExtension(filePath);
+        string baseName = Path.GetFileNameWithoutExtension(filePath);
 
         string cleaned = regexFileNameCleaner.CleanFileName(baseName);
 
         (string song, string artist) = SetCorrectFileNamePattern(cleaned, artistList);
 
-        song = textInfo.ToTitleCase(song.ToLower());
-        artist = textInfo.ToTitleCase(artist.ToLower());
+        song = textInfo.ToTitleCase(song.ToLowerInvariant());
+        artist = textInfo.ToTitleCase(artist.ToLowerInvariant());
 
         string newBaseName = FileSystemHelper.RemoveInvalidFileNameChars($"{song} - {artist}");
-        string directory = System.IO.Path.GetDirectoryName(filePath)!;
+        string directory = Path.GetDirectoryName(filePath)!;
 
-        return System.IO.Path.Combine(directory, newBaseName + ext);
+        return Path.Combine(directory, newBaseName + ext);
     }
 
-    private (string Song, string Artist) SetCorrectFileNamePattern(string cleaned, List<string> artistList)
+    private (string Song, string Artist) SetCorrectFileNamePattern(string cleaned, IReadOnlyList<string> artistList)
     {
         var dashParts = cleaned
             .Split('-', StringSplitOptions.RemoveEmptyEntries)
@@ -115,20 +129,17 @@ public class FileFixerService(
             if (artistRepository.ArtistExists(dashParts[0], artistList))
                 return (dashParts[1], dashParts[0]);
 
-            return artistRepository.ArtistExists(dashParts[1], artistList) 
-                ? (dashParts[0], dashParts[1]) 
+            return artistRepository.ArtistExists(dashParts[1], artistList)
+                ? (dashParts[0], dashParts[1])
                 : (dashParts[1], dashParts[0]);
         }
 
         var parts = regexFileNameCleaner.ParseParts(cleaned);
 
-        bool artistNonEmpty = !string.IsNullOrWhiteSpace(parts.Artist);
-        bool artistKnown = artistNonEmpty && artistRepository.ArtistExists(parts.Artist, artistList);
-
-        if (artistKnown || artistNonEmpty)
-        {
+        // A non-empty artist segment (known or not) is kept as-is; only a missing
+        // artist falls back to "Unknown Artist".
+        if (!string.IsNullOrWhiteSpace(parts.Artist))
             return (parts.Song, parts.Artist);
-        }
 
         return (cleaned, "Unknown Artist");
     }

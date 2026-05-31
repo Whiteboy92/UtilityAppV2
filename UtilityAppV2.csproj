@@ -10,7 +10,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Magick.NET-Q8-x64" Version="14.9.1" />
+        <PackageReference Include="Magick.NET-Q8-x64" Version="14.13.1" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" />
         <PackageReference Include="Ookii.Dialogs.Wpf" Version="5.0.1" />
@@ -24,7 +24,7 @@
             <XamlRuntime>Wpf</XamlRuntime>
             <SubType>Designer</SubType>
         </Page>
-        <Page Update="Views\FixNamesView\FixFileNamesView.xaml">
+        <Page Update="Views\FixFileNamesView\FixFileNamesView.xaml">
             <Generator>MSBuild:Compile</Generator>
             <XamlRuntime>Wpf</XamlRuntime>
             <SubType>Designer</SubType>
@@ -34,11 +34,6 @@
             <XamlRuntime>Wpf</XamlRuntime>
             <SubType>Designer</SubType>
         </Page>
-    </ItemGroup>
-
-    <ItemGroup>
-        <Folder Include="UI Components\MsgBox\" />
-        <Folder Include="UI Components\Resources\" />
     </ItemGroup>
 
     <ItemGroup>

@@ -1,5 +1,4 @@
-﻿using System.IO;
-using System.Windows;
+using System.IO;
 using System.Windows.Input;
 using UtilityAppV2.Commands;
 using UtilityAppV2.Core;
@@ -26,47 +25,41 @@ namespace UtilityAppV2.ViewModels
             this.dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
             this.settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
 
-            DownloadCommand = new RelayCommand(_ => RunDownloadPlaylistAsync(), _ => !IsDownloading);
+            DownloadCommand = new RelayCommand(_ => _ = RunDownloadPlaylistAsync(), _ => !IsDownloading);
             CancelCommand = new RelayCommand(_ => CancelDownload(), _ => IsDownloading);
-
-            LoadUserSettingsAsync();
         }
 
-        private async void LoadUserSettingsAsync()
+        /// <summary>Loads persisted settings. Invoked from the view's Loaded event (not the ctor).</summary>
+        public async Task InitializeAsync()
         {
-            settings = await settingsService.LoadSettingsAsync();
-            PlaylistUrl = settings.PlaylistLink;
-            FirstDownloadedSong = settings.FirstDownloadedSong;
+            try
+            {
+                settings = await settingsService.LoadSettingsAsync();
+                PlaylistUrl = settings.PlaylistLink;
+                FirstDownloadedSong = settings.FirstDownloadedSong;
+            }
+            catch (Exception ex)
+            {
+                dialogService.ShowError($"Failed to load settings:\n{ex.Message}");
+            }
         }
 
         public string? PlaylistUrl
         {
             get;
-            set
-            {
-                field = value;
-                OnPropertyChanged();
-            }
+            set => SetProperty(ref field, value);
         } = string.Empty;
 
         public string? FirstDownloadedSong
         {
             get;
-            set
-            {
-                field = value;
-                OnPropertyChanged();
-            }
+            set => SetProperty(ref field, value);
         } = string.Empty;
 
         public double Progress
         {
             get;
-            set
-            {
-                field = value;
-                OnPropertyChanged();
-            }
+            set => SetProperty(ref field, value);
         }
 
         public bool IsDownloading
@@ -74,8 +67,7 @@ namespace UtilityAppV2.ViewModels
             get;
             set
             {
-                field = value;
-                OnPropertyChanged();
+                if (!SetProperty(ref field, value)) return;
                 ((RelayCommand)DownloadCommand).RaiseCanExecuteChanged();
                 ((RelayCommand)CancelCommand).RaiseCanExecuteChanged();
             }
@@ -84,7 +76,7 @@ namespace UtilityAppV2.ViewModels
         public ICommand DownloadCommand { get; }
         public ICommand CancelCommand { get; }
 
-        private async void RunDownloadPlaylistAsync()
+        private async Task RunDownloadPlaylistAsync()
         {
             try
             {
@@ -92,46 +84,44 @@ namespace UtilityAppV2.ViewModels
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"An error occurred:\n{ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                dialogService.ShowError($"An error occurred:\n{ex.Message}");
             }
         }
 
         private async Task DownloadPlaylistAsync()
         {
-            var dialogResult = await dialogService.ShowDownloadPlaylistDialogAsync();
-            if (!dialogResult.Result) return;
-
-            string playlistUrlInput = dialogResult.PlaylistUrl;
-            int numberOfSongs = dialogResult.NumberOfSongs;
-
-            string downloadFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "Playlist");
-            Directory.CreateDirectory(downloadFolder);
-
+            // Claim the busy flag before awaiting the dialog so a second click can't
+            // open a second dialog (CanExecute disables the command immediately).
             IsDownloading = true;
-            Progress = 0;
-            cancellationTokenSource = new CancellationTokenSource();
 
             try
             {
-                // Progress reporter marshaled to UI thread automatically
+                var dialogResult = await dialogService.ShowDownloadPlaylistDialogAsync();
+                if (!dialogResult.Result) return;
+
+                string playlistUrlInput = dialogResult.PlaylistUrl;
+                int numberOfSongs = dialogResult.NumberOfSongs;
+
+                string downloadFolder = FilePathConstants.PlaylistFolder;
+                Directory.CreateDirectory(downloadFolder);
+
+                Progress = 0;
+                cancellationTokenSource = new CancellationTokenSource();
+
+                // Progress reporter is marshaled to the UI thread automatically.
                 var progressReporter = new Progress<(int downloaded, int total, string currentSong)>(report =>
                 {
-                    Progress = Math.Min(100, (report.downloaded * 100.0) / report.total);
+                    if (report.total > 0)
+                        Progress = Math.Min(100, (report.downloaded * 100.0) / report.total);
                 });
 
-                UserSettings userSettings = await settingsService.LoadSettingsAsync();
+                DownloadResult result = await downloadService.DownloadPlaylistAsync(
+                    playlistUrlInput,
+                    numberOfSongs,
+                    downloadFolder,
+                    progressReporter,
+                    cancellationTokenSource.Token);
 
-                // Run download on background thread
-                DownloadResult result = await Task.Run(() =>
-                    downloadService.DownloadPlaylistAsync(
-                        playlistUrlInput,
-                        numberOfSongs,
-                        downloadFolder,
-                        progressReporter,
-                        cancellationTokenSource.Token,
-                        userSettings));
-
-                // Update settings and UI
                 settings.FirstDownloadedSong = result.FirstSongName;
                 settings.PlaylistLink = playlistUrlInput;
                 await settingsService.SaveSettingsAsync(settings);
@@ -139,11 +129,26 @@ namespace UtilityAppV2.ViewModels
                 PlaylistUrl = settings.PlaylistLink;
                 FirstDownloadedSong = settings.FirstDownloadedSong;
 
-                MessageBox.Show($"Playlist downloaded successfully!\nFirst song: {result.FirstSongName}", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                if (result.HadErrors)
+                {
+                    dialogService.ShowError(
+                        "Some videos failed to download.\n\n" +
+                        $"Requested: {result.TotalSongs}\n" +
+                        $"Downloaded: {result.DownloadedSongs}\n" +
+                        (string.IsNullOrEmpty(result.FirstSongName) ? "" : $"First song: {result.FirstSongName}\n") +
+                        $"\nyt-dlp error output:\n{result.ErrorDetail}",
+                        "Download Error");
+                }
+                else
+                {
+                    dialogService.ShowInfo(
+                        $"Playlist downloaded successfully!\nFirst song: {result.FirstSongName}",
+                        "Success");
+                }
             }
             catch (OperationCanceledException)
             {
-                MessageBox.Show("Download was canceled.", "Canceled", MessageBoxButton.OK, MessageBoxImage.Warning);
+                dialogService.ShowWarning("Download was canceled.", "Canceled");
             }
             finally
             {

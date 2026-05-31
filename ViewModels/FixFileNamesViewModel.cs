@@ -1,4 +1,3 @@
-﻿using System.Windows;
 using System.Windows.Input;
 using UtilityAppV2.Commands;
 using UtilityAppV2.Core;
@@ -10,17 +9,15 @@ namespace UtilityAppV2.ViewModels;
 public class FixFileNamesViewModel : BaseViewModel
 {
     private readonly IFileFixerService fileFixerService;
+    private readonly IDialogService dialogService;
     private CancellationTokenSource? cancellationTokenSource;
 
-    public FixFileNamesViewModel(IFileFixerService fileFixerService)
+    public FixFileNamesViewModel(IFileFixerService fileFixerService, IDialogService dialogService)
     {
         this.fileFixerService = fileFixerService ?? throw new ArgumentNullException(nameof(fileFixerService));
+        this.dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
 
-        FixCommand = new RelayCommand(runAsyncSafe =>
-        {
-            _ = RunAsyncSafe();
-        }, _ => !IsProcessing);
-
+        FixCommand = new RelayCommand(_ => _ = RunAsyncSafe(), _ => !IsProcessing);
         CancelCommand = new RelayCommand(_ => Cancel(), _ => IsProcessing);
     }
 
@@ -32,18 +29,14 @@ public class FixFileNamesViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Unexpected error: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            dialogService.ShowError($"Unexpected error: {ex.Message}");
         }
     }
 
     public double Progress
     {
         get;
-        set
-        {
-            field = value;
-            OnPropertyChanged();
-        }
+        set => SetProperty(ref field, value);
     }
 
     public bool IsProcessing
@@ -51,8 +44,7 @@ public class FixFileNamesViewModel : BaseViewModel
         get;
         set
         {
-            field = value;
-            OnPropertyChanged();
+            if (!SetProperty(ref field, value)) return;
             ((RelayCommand)FixCommand).RaiseCanExecuteChanged();
             ((RelayCommand)CancelCommand).RaiseCanExecuteChanged();
         }
@@ -63,35 +55,36 @@ public class FixFileNamesViewModel : BaseViewModel
 
     private async Task RunAsync()
     {
+        IsProcessing = true;
+        Progress = 0;
+        cancellationTokenSource = new CancellationTokenSource();
+
         try
         {
-            IsProcessing = true;
-            Progress = 0;
-            cancellationTokenSource = new CancellationTokenSource();
             var progressReporter = new Progress<double>(p => Progress = p);
 
             FileFixResult result = await fileFixerService.FixFilesAsync(progressReporter, cancellationTokenSource.Token);
 
-            MessageBox.Show(
-                $"Files processed: {result.ProcessedFiles}/{result.TotalFiles}\nRenamed: {result.RenamedFiles}\nDuration: {result.Duration.TotalSeconds:F1}s",
-                "File fixer",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
+            dialogService.ShowInfo(
+                $"Files processed: {result.ProcessedFiles}/{result.TotalFiles}\n" +
+                $"Renamed: {result.RenamedFiles}\n" +
+                $"Duration: {result.Duration.TotalSeconds:F1}s",
+                "File fixer");
         }
         catch (OperationCanceledException)
         {
-            MessageBox.Show("Operation canceled.", "Canceled", MessageBoxButton.OK, MessageBoxImage.Warning);
+            dialogService.ShowWarning("Operation canceled.", "Canceled");
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Error while fixing files: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            dialogService.ShowError($"Error while fixing files: {ex.Message}");
         }
         finally
         {
             IsProcessing = false;
+            Progress = 0;
             cancellationTokenSource?.Dispose();
             cancellationTokenSource = null;
-            Progress = 0;
         }
     }
 

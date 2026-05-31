@@ -1,67 +1,43 @@
-﻿using System.IO;
-using System.Windows;
-using UtilityAppV2.Models;
+using System.IO;
 
 namespace UtilityAppV2.Helpers
 {
+    /// <summary>
+    /// Pure validation helpers. They never touch the UI — callers decide how to surface
+    /// the returned message, which keeps the move pipeline testable and thread-safe.
+    /// </summary>
     public static class ValidationHelper
     {
-        public static bool ValidateSourceFolder(string sourceFolder)
+        public static bool ValidateSourceFolder(string sourceFolder, out string? error)
         {
             if (Directory.Exists(sourceFolder))
             {
+                error = null;
                 return true;
             }
 
-            MessageBox.Show(
-                $"Source folder does not exist:\n{sourceFolder}",
-                "Move Files Error",
-                MessageBoxButton.OK,
-                MessageBoxImage.Error);
-
+            error = $"Source folder does not exist:\n{sourceFolder}";
             return false;
         }
 
-        public static bool EnsureNoUnknownArtist(
-            string[] files,
-            int totalFiles,
-            DateTime startTime,
-            out FileMoveResult? result)
+        public static bool EnsureNoUnknownArtist(string[] files, out string? error)
         {
             var filesWithUnknownArtist = files
-                .Where(f =>
-                {
-                    string name = Path.GetFileNameWithoutExtension(f);
-                    return name.IndexOf("Unknown Artist", StringComparison.OrdinalIgnoreCase) >= 0;
-                })
+                .Where(f => Path.GetFileNameWithoutExtension(f)
+                    .Contains("Unknown Artist", StringComparison.OrdinalIgnoreCase))
                 .ToList();
 
             if (filesWithUnknownArtist.Count == 0)
             {
-                result = null;
+                error = null;
                 return true;
             }
 
-            string message = "Some files contain 'Unknown Artist' in their names.\n" +
-                             "Please fix the filenames before moving.\n\n" +
-                             "Examples:\n" +
-                             string.Join(Environment.NewLine,
-                                 filesWithUnknownArtist
-                                     .Take(5)
-                                     .Select(Path.GetFileName));
-
-            MessageBox.Show(
-                message,
-                "Invalid File Names",
-                MessageBoxButton.OK,
-                MessageBoxImage.Error);
-
-            result = new FileMoveResult
-            {
-                TotalFiles = totalFiles,
-                MovedFiles = 0,
-                Duration = DateTime.UtcNow - startTime,
-            };
+            error = "Some files contain 'Unknown Artist' in their names.\n" +
+                    "Please fix the filenames before moving.\n\n" +
+                    "Examples:\n" +
+                    string.Join(Environment.NewLine,
+                        filesWithUnknownArtist.Take(5).Select(Path.GetFileName));
 
             return false;
         }
@@ -69,9 +45,7 @@ namespace UtilityAppV2.Helpers
         public static bool EnsureNoDuplicates(
             string[] files,
             string destinationFolder,
-            int totalFiles,
-            DateTime startTime,
-            out FileMoveResult? result)
+            out string? error)
         {
             var existingDestFileNames = Directory
                 .GetFiles(destinationFolder, "*.*", SearchOption.TopDirectoryOnly)
@@ -93,13 +67,13 @@ namespace UtilityAppV2.Helpers
                 .ToList();
 
             var collidingExistingNames = newDestFileNames
-                .Where(name => existingDestFileNames.Contains(name))
+                .Where(existingDestFileNames.Contains)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
             if (duplicateNewNames.Count == 0 && collidingExistingNames.Count == 0)
             {
-                result = null;
+                error = null;
                 return true;
             }
 
@@ -121,19 +95,7 @@ namespace UtilityAppV2.Helpers
 
             message += "Please resolve duplicates (rename or remove) before moving.";
 
-            MessageBox.Show(
-                message,
-                "Duplicate Files Detected",
-                MessageBoxButton.OK,
-                MessageBoxImage.Error);
-
-            result = new FileMoveResult
-            {
-                TotalFiles = totalFiles,
-                MovedFiles = 0,
-                Duration = DateTime.UtcNow - startTime,
-            };
-
+            error = message;
             return false;
         }
     }

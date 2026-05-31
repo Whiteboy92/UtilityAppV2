@@ -6,6 +6,6 @@ public interface IFileConversionService
 {
     Task<ConversionResult> ConvertFilesToPngAsync(
         string sourceFolder,
-        IProgress<double> progress,
+        IProgress<double>? progress,
         CancellationToken cancellationToken = default);
 }

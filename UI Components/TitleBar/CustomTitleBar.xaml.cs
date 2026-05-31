@@ -1,4 +1,5 @@
-﻿using System.Windows;
+using System.Windows;
+using System.Windows.Input;
 
 namespace UtilityAppV2.UI_Components.TitleBar
 {
@@ -16,36 +17,47 @@ namespace UtilityAppV2.UI_Components.TitleBar
         public CustomTitleBar()
         {
             InitializeComponent();
-
-            MouseLeftButtonDown += (_, e) =>
-            {
-                var window = Window.GetWindow(this);
-                if (window == null) return;
-
-                if (e.ClickCount == 2)
-                    window.WindowState = window.WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
-
-                window.DragMove();
-                e.Handled = true;
-            };
+            MouseLeftButtonDown += OnTitleBarMouseLeftButtonDown;
         }
 
-        private void Close_Click(object sender, RoutedEventArgs e)
+        private void OnTitleBarMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            Window.GetWindow(this)?.Close();
+            var window = Window.GetWindow(this);
+            if (window is null) return;
+
+            if (e.ClickCount == 2)
+            {
+                ToggleMaximize(window);
+                e.Handled = true;
+                return;
+            }
+
+            // DragMove must only be called while the primary button is pressed,
+            // otherwise it throws — guard against the stray double-click case.
+            if (e.ButtonState == MouseButtonState.Pressed)
+                window.DragMove();
         }
+
+        private void Close_Click(object sender, RoutedEventArgs e) =>
+            Window.GetWindow(this)?.Close();
 
         private void Minimize_Click(object sender, RoutedEventArgs e)
         {
             var window = Window.GetWindow(this);
-            window?.WindowState = WindowState.Minimized;
+            if (window is not null)
+                window.WindowState = WindowState.Minimized;
         }
 
         private void Maximize_Click(object sender, RoutedEventArgs e)
         {
             var window = Window.GetWindow(this);
-
-            window?.WindowState = window.WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+            if (window is not null)
+                ToggleMaximize(window);
         }
+
+        private static void ToggleMaximize(Window window) =>
+            window.WindowState = window.WindowState == WindowState.Maximized
+                ? WindowState.Normal
+                : WindowState.Maximized;
     }
 }
