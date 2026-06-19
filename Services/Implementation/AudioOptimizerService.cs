@@ -8,6 +8,9 @@ namespace UtilityAppV2.Services.Implementation;
 
 public class AudioOptimizerService : IAudioOptimizerService
 {
+    // One ffmpeg encode per logical core — saturate the machine.
+    private static readonly int MaxParallelism = Environment.ProcessorCount;
+
     private readonly string ffmpegPath;
 
     public AudioOptimizerService()
@@ -44,36 +47,36 @@ public class AudioOptimizerService : IAudioOptimizerService
         long bytesSaved = 0;
         int attempted = 0;
 
-        await Task.Run(() =>
+        await Parallel.ForEachAsync(mp3Files, new ParallelOptions
         {
-            foreach (var file in mp3Files)
+            MaxDegreeOfParallelism = MaxParallelism,
+            CancellationToken = cancellationToken,
+        },
+        async (file, token) =>
+        {
+            try
             {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                try
+                var (saved, didShrink) = await OptimizeFileAsync(file, token);
+                if (didShrink)
                 {
-                    var (saved, didShrink) = OptimizeFile(file);
-                    if (didShrink)
-                    {
-                        optimized++;
-                        bytesSaved += saved;
-                    }
-                }
-                catch (OperationCanceledException)
-                {
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"Error optimizing {file}: {ex.Message}");
-                }
-                finally
-                {
-                    attempted++;
-                    progress?.Report(attempted * 100.0 / total);
+                    Interlocked.Increment(ref optimized);
+                    Interlocked.Add(ref bytesSaved, saved);
                 }
             }
-        }, cancellationToken);
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error optimizing {file}: {ex.Message}");
+            }
+            finally
+            {
+                int done = Interlocked.Increment(ref attempted);
+                progress?.Report(done * 100.0 / total);
+            }
+        });
 
         progress?.Report(100);
         sw.Stop();
@@ -87,10 +90,13 @@ public class AudioOptimizerService : IAudioOptimizerService
         };
     }
 
-    // Strips embedded cover art / padding by copying only the audio stream
-    // (no re-encode). The result replaces the original only when it's actually
-    // smaller, so files without art are left untouched.
-    private (long BytesSaved, bool DidShrink) OptimizeFile(string file)
+    // Re-encodes to LAME V0 (~245 kbps VBR), which is transparent — audibly
+    // identical to the source for human ears. yt-dlp writes bloated 320 kbps CBR
+    // even though YouTube's real source is ~128-160 kbps, so V0 reclaims that
+    // wasted headroom with no perceptible quality loss. Cover art is dropped and
+    // ID3 tags preserved. The result replaces the original only when it's
+    // actually smaller, so already-lean files are left untouched.
+    private async Task<(long BytesSaved, bool DidShrink)> OptimizeFileAsync(string file, CancellationToken cancellationToken)
     {
         long originalSize = new FileInfo(file).Length;
         string tempPath = file + ".opt.tmp.mp3";
@@ -110,9 +116,11 @@ public class AudioOptimizerService : IAudioOptimizerService
         // Audio only: drops the attached cover-art video stream.
         psi.ArgumentList.Add("-map");
         psi.ArgumentList.Add("0:a");
-        // Bit-for-bit copy — no re-encode, no quality loss.
+        // LAME V0 VBR — transparent quality, smaller than 320k CBR.
         psi.ArgumentList.Add("-c:a");
-        psi.ArgumentList.Add("copy");
+        psi.ArgumentList.Add("libmp3lame");
+        psi.ArgumentList.Add("-q:a");
+        psi.ArgumentList.Add("0");
         // Preserve ID3 tags.
         psi.ArgumentList.Add("-map_metadata");
         psi.ArgumentList.Add("0");
@@ -131,7 +139,17 @@ public class AudioOptimizerService : IAudioOptimizerService
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
 
-            process.WaitForExit();
+            try
+            {
+                await process.WaitForExitAsync(cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                // Kill the encode so it stops writing and releases the temp file
+                // before the finally block tries to delete it.
+                TryKill(process);
+                throw;
+            }
 
             if (process.ExitCode != 0 || !File.Exists(tempPath))
                 return (0, false);
@@ -154,6 +172,19 @@ public class AudioOptimizerService : IAudioOptimizerService
             {
                 try { File.Delete(tempPath); } catch { /* best-effort cleanup */ }
             }
+        }
+    }
+
+    private static void TryKill(Process process)
+    {
+        try
+        {
+            if (!process.HasExited)
+                process.Kill(entireProcessTree: true);
+        }
+        catch
+        {
+            // Process already exited or is inaccessible — nothing to clean up.
         }
     }
 }
