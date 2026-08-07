@@ -9,6 +9,9 @@ public class FileMoveResult
     /// <summary>Set when the operation was aborted by validation; null on success.</summary>
     public string? ErrorMessage { get; init; }
 
+    /// <summary>Non-fatal per-file move failures; the rest of the batch still moves.</summary>
+    public IReadOnlyList<string> MoveErrors { get; init; } = [];
+
     /// <summary>Non-fatal tagging failures encountered after moving.</summary>
     public IReadOnlyList<string> TagErrors { get; init; } = [];
 

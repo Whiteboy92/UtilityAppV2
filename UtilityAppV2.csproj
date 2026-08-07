@@ -9,13 +9,22 @@
         <ApplicationIcon>Resources\Icons\UtilityAppV2Icon.ico</ApplicationIcon>
     </PropertyGroup>
 
+    <!-- The test project lives under Tests\; keep its sources out of the app build
+         (the WPF SDK otherwise globs **/*.cs recursively into this project). -->
     <ItemGroup>
-        <PackageReference Include="Magick.NET-Q8-x64" Version="14.13.1" />
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" />
+        <Compile Remove="Tests\**" />
+        <Page Remove="Tests\**" />
+        <None Remove="Tests\**" />
+        <Resource Remove="Tests\**" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Magick.NET-Q8-x64" Version="14.16.0" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.10" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.10" />
         <PackageReference Include="Ookii.Dialogs.Wpf" Version="5.0.1" />
         <PackageReference Include="TagLibSharp" Version="2.3.0" />
-        <PackageReference Include="WPF-UI" Version="4.1.0" />
+        <PackageReference Include="WPF-UI" Version="4.3.0" />
     </ItemGroup>
 
     <ItemGroup>

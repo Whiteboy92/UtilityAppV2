@@ -6,8 +6,11 @@ using UtilityAppV2.Services.Interfaces;
 
 namespace UtilityAppV2.Services.Implementation
 {
-    public class MoveFilesService : IMoveFilesService
+    public class MoveFilesService(IArtistRepository artistRepository) : IMoveFilesService
     {
+        private readonly IArtistRepository artistRepository =
+            artistRepository ?? throw new ArgumentNullException(nameof(artistRepository));
+
         public async Task<FileMoveResult> MoveFilesAsync(
             IProgress<double>? progress,
             CancellationToken cancellationToken)
@@ -49,9 +52,13 @@ namespace UtilityAppV2.Services.Implementation
                 return Aborted(totalFiles, startTime, duplicateError);
 
             // 5. Move files (off the UI thread)
-            var movedFiles = await Task.Run(
+            var (movedFiles, moveErrors) = await Task.Run(
                 () => MoveFilesCore(files, destinationFolder, progress, cancellationToken),
                 cancellationToken);
+
+            // New files landed in the DB folder, so the cached artist list is now
+            // stale — drop it so the next scan picks up the newly added artists.
+            artistRepository.InvalidateCache();
 
             // 6. Re-tag the whole destination so track numbers stay unique and
             //    sequential across the entire library (not just this batch).
@@ -63,11 +70,12 @@ namespace UtilityAppV2.Services.Implementation
                 TotalFiles = totalFiles,
                 MovedFiles = movedFiles.Count,
                 Duration = DateTime.UtcNow - startTime,
+                MoveErrors = moveErrors,
                 TagErrors = tagErrors,
             };
         }
 
-        private static List<string> MoveFilesCore(
+        private static (List<string> Moved, List<string> Errors) MoveFilesCore(
             string[] files,
             string destinationFolder,
             IProgress<double>? progress,
@@ -75,6 +83,7 @@ namespace UtilityAppV2.Services.Implementation
         {
             int totalFiles = files.Length;
             var moved = new List<string>(totalFiles);
+            var errors = new List<string>();
 
             for (int i = 0; i < totalFiles; i++)
             {
@@ -83,13 +92,22 @@ namespace UtilityAppV2.Services.Implementation
                 string sourceFile = files[i];
                 string destinationFile = Path.Combine(destinationFolder, Path.GetFileName(sourceFile));
 
-                File.Move(sourceFile, destinationFile, overwrite: false);
-                moved.Add(destinationFile);
+                try
+                {
+                    File.Move(sourceFile, destinationFile, overwrite: false);
+                    moved.Add(destinationFile);
+                }
+                catch (Exception ex)
+                {
+                    // A single unmovable file (locked, permission, race) must not
+                    // abort the batch and skip the downstream tagging step.
+                    errors.Add($"{Path.GetFileName(sourceFile)}: {ex.Message}");
+                }
 
-                progress?.Report((moved.Count * 100.0) / totalFiles);
+                progress?.Report(((i + 1) * 100.0) / totalFiles);
             }
 
-            return moved;
+            return (moved, errors);
         }
 
         private static FileMoveResult Aborted(int totalFiles, DateTime startTime, string? error) =>
