@@ -40,16 +40,40 @@ namespace UtilityAppV2.Helpers
                     try
                     {
                         using var tfile = TagLib.File.Create(item.Path);
+                        var tag = tfile.Tag;
 
-                        if (!string.IsNullOrWhiteSpace(item.SongName))
-                            tfile.Tag.Title = item.SongName;
+                        bool changed = false;
 
-                        if (!string.IsNullOrWhiteSpace(item.ArtistName))
-                            tfile.Tag.Performers = [item.ArtistName];
+                        if (!string.IsNullOrWhiteSpace(item.SongName) && tag.Title != item.SongName)
+                        {
+                            tag.Title = item.SongName;
+                            changed = true;
+                        }
 
-                        tfile.Tag.Album = AlbumName;
-                        tfile.Tag.Track = trackNumber;
-                        tfile.Save();
+                        if (!string.IsNullOrWhiteSpace(item.ArtistName) &&
+                            (tag.Performers.Length != 1 || tag.Performers[0] != item.ArtistName))
+                        {
+                            tag.Performers = [item.ArtistName];
+                            changed = true;
+                        }
+
+                        if (tag.Album != AlbumName)
+                        {
+                            tag.Album = AlbumName;
+                            changed = true;
+                        }
+
+                        if (tag.Track != trackNumber)
+                        {
+                            tag.Track = trackNumber;
+                            changed = true;
+                        }
+
+                        // Only touch the disk when something actually differs — a
+                        // library-wide re-tag on every move would otherwise rewrite
+                        // thousands of already-correct files.
+                        if (changed)
+                            tfile.Save();
                     }
                     catch (Exception ex)
                     {

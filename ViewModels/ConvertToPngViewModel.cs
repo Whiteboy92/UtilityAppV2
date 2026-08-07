@@ -18,7 +18,7 @@ public class ConvertToPngViewModel : BaseViewModel
         set => SetProperty(ref field, value);
     }
 
-    private bool IsProcessing
+    public bool IsProcessing
     {
         get;
         set
@@ -66,6 +66,14 @@ public class ConvertToPngViewModel : BaseViewModel
                 $"Converted: {result.ConvertedFiles}\n" +
                 $"Duration: {result.Duration.TotalSeconds:F2} seconds",
                 "Success");
+
+            if (result.FailedFiles.Count > 0)
+            {
+                dialogService.ShowWarning(
+                    $"{result.FailedFiles.Count} file(s) could not be converted:\n\n" +
+                    string.Join(Environment.NewLine, result.FailedFiles.Take(10)),
+                    "Conversion Warning");
+            }
         }
         catch (OperationCanceledException)
         {

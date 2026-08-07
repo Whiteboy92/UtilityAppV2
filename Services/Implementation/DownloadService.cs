@@ -60,7 +60,11 @@ namespace UtilityAppV2.Services.Implementation
                 var itemMatch = ItemProgressRegex().Match(e.Data);
                 if (itemMatch.Success)
                 {
-                    total = int.Parse(itemMatch.Groups[2].Value);
+                    // yt-dlp's "of N" can report the full playlist size, not the
+                    // requested slice — clamp so a 10-of-500 download doesn't leave
+                    // the bar stuck at ~2%.
+                    if (int.TryParse(itemMatch.Groups[2].Value, out var reported))
+                        total = Math.Min(reported, numberOfSongs);
                     return;
                 }
 

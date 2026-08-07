@@ -159,8 +159,9 @@ public class AudioOptimizerService : IAudioOptimizerService
             // Only adopt the optimized file when it actually saved space.
             if (newSize > 0 && newSize < originalSize)
             {
-                File.Delete(file);
-                File.Move(tempPath, file);
+                // Atomic replace on the same volume — never delete the original
+                // first, so an error here can't lose the source file.
+                File.Move(tempPath, file, overwrite: true);
                 return (originalSize - newSize, true);
             }
 

@@ -22,7 +22,7 @@ public class RegexFileNameCleaner : IRegexFileNameCleaner
         @"\(\s*4K\s*\)",
         @"\(\s*Hardstyle\s*\)",
         @"\(\s*frenchcore\s*\)",
-        @"french\s*core",
+        @"\bfrench\s*core\b",
         @"\(\s*Lyrics\s*\)",
         @"\[\s*Lyrics\s*\]",
         @"\(\s*Music\s+Video\s*\)",

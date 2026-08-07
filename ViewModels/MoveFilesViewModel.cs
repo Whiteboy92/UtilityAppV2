@@ -77,6 +77,14 @@ namespace UtilityAppV2.ViewModels
                     return;
                 }
 
+                if (result.MoveErrors.Count > 0)
+                {
+                    dialogService.ShowWarning(
+                        "Some files could not be moved:\n\n" +
+                        string.Join(Environment.NewLine, result.MoveErrors.Take(10)),
+                        "Move Warning");
+                }
+
                 if (result.TagErrors.Count > 0)
                 {
                     dialogService.ShowWarning(
