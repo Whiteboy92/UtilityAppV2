@@ -1,6 +1,5 @@
 using System.IO;
 using ImageMagick;
-using UtilityAppV2.Helpers;
 using UtilityAppV2.Models;
 using UtilityAppV2.Services.Interfaces;
 
@@ -69,6 +68,24 @@ public class FileConversionService : IFileConversionService
             }
         }, cancellationToken);
 
+        // Pick every output name up front, on one thread. Doing it inside the
+        // parallel loop races: "IMG.heic" and "IMG.HEIF" would both see "IMG.png"
+        // as free and one write would clobber the other.
+        var outputPaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var reserved = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var file in heicFiles)
+        {
+            // Never overwrite an existing file either — "foo (1).png" style, matching
+            // FileSystemHelper.GetUniqueFilePath.
+            string baseName = Path.GetFileNameWithoutExtension(file);
+            string candidate = Path.Combine(sourceFolder, baseName + ".png");
+            for (int i = 1; reserved.Contains(candidate) || File.Exists(candidate); i++)
+                candidate = Path.Combine(sourceFolder, $"{baseName} ({i}).png");
+
+            reserved.Add(candidate);
+            outputPaths[file] = candidate;
+        }
+
         int converted = 0;
         var failures = new System.Collections.Concurrent.ConcurrentBag<string>();
 
@@ -77,10 +94,12 @@ public class FileConversionService : IFileConversionService
             MaxDegreeOfParallelism = MaxParallelism,
             CancellationToken = cancellationToken,
         },
-        async (file, token) =>
+        (file, token) =>
         {
             try
             {
+                token.ThrowIfCancellationRequested();
+
                 using var img = new MagickImage(file);
 
                 img.Format = MagickFormat.Png;
@@ -91,17 +110,14 @@ public class FileConversionService : IFileConversionService
                 img.Settings.SetDefine(MagickFormat.Png, "compression-level", "1");
                 img.Settings.SetDefine(MagickFormat.Png, "compression-filter", "0");
 
-                // Depth is deliberately NOT forced to 8: a 10-bit HEIC would be
-                // truncated (the one genuinely lossy step). Inherit the source
-                // depth so the conversion stays bit-for-bit lossless.
+                // Note: the app uses Magick.NET-Q8, so pixels are held at 8 bits per
+                // channel — a 10-bit HEIC is reduced to 8-bit on decode. Fine for
+                // typical phone photos; switch to the Q16 package to keep >8-bit depth.
 
-                // Never overwrite an existing file in the source folder — pick a unique
-                // name (e.g. "foo (1).png") so a stray same-named PNG isn't clobbered.
-                string newFile = FileSystemHelper.GetUniqueFilePath(Path.Combine(
-                    sourceFolder,
-                    Path.GetFileNameWithoutExtension(file) + ".png"));
-
-                await img.WriteAsync(newFile, token);
+                // Synchronous Write: WriteAsync encodes to a memory buffer first and
+                // then copies it out, an extra pass with no benefit inside this
+                // already-parallel loop.
+                img.Write(outputPaths[file]);
 
                 File.Delete(file);
 
@@ -117,6 +133,8 @@ public class FileConversionService : IFileConversionService
                 System.Diagnostics.Debug.WriteLine($"Error converting {file}: {ex.Message}");
                 failures.Add($"{Path.GetFileName(file)}: {ex.Message}");
             }
+
+            return ValueTask.CompletedTask;
         });
 
         // Snap the bar to complete even if some files failed, so the UI never appears
