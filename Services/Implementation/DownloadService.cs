@@ -10,16 +10,19 @@ namespace UtilityAppV2.Services.Implementation
 {
     public partial class DownloadService : IDownloadService
     {
-        private readonly string ytDlpPath;
+        private readonly IYtDlpProvider ytDlpProvider;
+        private string ytDlpPath = string.Empty;
         private readonly string toolsDir;
         private readonly string ffmpegPath;
         private readonly string ffprobePath;
 
-        public DownloadService()
+        public DownloadService(IYtDlpProvider ytDlpProvider)
         {
-            var baseDir = AppContext.BaseDirectory;
+            this.ytDlpProvider = ytDlpProvider;
 
-            ytDlpPath = Path.Combine(baseDir, FilePathConstants.YtDlpPath);
+            // ffmpeg/ffprobe ship next to the app; yt-dlp is fetched on demand into a
+            // writable folder by the provider (see EnsureToolsAsync).
+            var baseDir = AppContext.BaseDirectory;
             toolsDir = Path.Combine(baseDir, "Resources", "Tools");
             ffmpegPath = Path.Combine(toolsDir, "ffmpeg.exe");
             ffprobePath = Path.Combine(toolsDir, "ffprobe.exe");
@@ -33,7 +36,7 @@ namespace UtilityAppV2.Services.Implementation
             CancellationToken cancellationToken)
         {
             ValidateInputs(playlistUrl, numberOfSongs);
-            EnsureToolsExist();
+            await EnsureToolsAsync(cancellationToken);
 
             Directory.CreateDirectory(downloadFolder);
 
@@ -127,10 +130,10 @@ namespace UtilityAppV2.Services.Implementation
                 throw new ArgumentOutOfRangeException(nameof(numberOfSongs), "Number of songs must be greater than zero.");
         }
 
-        private void EnsureToolsExist()
+        private async Task EnsureToolsAsync(CancellationToken cancellationToken)
         {
-            if (!File.Exists(ytDlpPath))
-                throw new FileNotFoundException("yt-dlp executable not found.", ytDlpPath);
+            // Downloads yt-dlp from GitHub on first use if it isn't cached yet.
+            ytDlpPath = await ytDlpProvider.EnsureAsync(cancellationToken);
 
             if (!File.Exists(ffmpegPath))
                 throw new FileNotFoundException("ffmpeg executable not found.", ffmpegPath);

@@ -36,6 +36,10 @@ public class DialogService(ISettingsService settingsService) : IDialogService
     public void ShowInfo(string message, string title = "Information") =>
         Show(message, title, MessageBoxImage.Information);
 
+    public bool Confirm(string message, string title = "Confirm") =>
+        Invoke(() => MessageBox.Show(
+            message, title, MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes);
+
     public string? PickFolder(string? title = null)
     {
         return Invoke(() =>

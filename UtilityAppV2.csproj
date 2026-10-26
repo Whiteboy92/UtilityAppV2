@@ -7,6 +7,21 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <UseWPF>true</UseWPF>
         <ApplicationIcon>Resources\Icons\UtilityAppV2Icon.ico</ApplicationIcon>
+
+        <!-- Ship as one self-contained .exe: no loose managed/native DLLs next to
+             it, no .NET runtime required on the target machine. ffmpeg/ffprobe/
+             yt-dlp stay as external files under Resources\Tools (separate processes,
+             cannot be embedded). -->
+        <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+        <SelfContained>true</SelfContained>
+        <PublishSingleFile>true</PublishSingleFile>
+        <!-- Bundle EVERYTHING (managed, native, and the ffmpeg/ffprobe content exes)
+             into the one .exe. At launch the host extracts it all to a per-user temp
+             dir and points AppContext.BaseDirectory there, so the app finds its tools
+             with no loose files shipped next to the exe. -->
+        <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+        <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+        <DebugType>embedded</DebugType>
     </PropertyGroup>
 
     <!-- The test project lives under Tests\; keep its sources out of the app build
@@ -53,6 +68,10 @@
         <None Remove="UI Components\TitleBar\Icons\Minimize.png" />
         <Resource Include="UI Components\TitleBar\Icons\Minimize.png" />
         <None Remove="Resources\Icons\UtilityAppV2Icon.ico" />
+        <!-- ffmpeg/ffprobe are embedded in the single exe (see
+             IncludeAllContentForSelfExtract) and auto-extracted to a temp dir at
+             runtime, from where they run as child processes. Nothing sits next to
+             the shipped .exe. -->
         <None Update="Resources\Tools\ffmpeg.exe">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
@@ -62,9 +81,9 @@
         <None Update="Resources\Tools\ffplay.exe">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
-        <None Update="Resources\Tools\yt-dlp.exe">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-        </None>
+        <!-- yt-dlp is NOT bundled. YtDlpProvider downloads it at runtime into
+             %LOCALAPPDATA%\UtilityAppV2\Tools and self-updates it there (yt-dlp -U),
+             which is the only place those updates can persist. -->
         <None Update="Resources\Icons\UtilityAppV2Icon.ico">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>

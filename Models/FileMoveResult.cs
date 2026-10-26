@@ -4,6 +4,10 @@ public class FileMoveResult
 {
     public int TotalFiles { get; init; }
     public int MovedFiles { get; init; }
+
+    /// <summary>Files the user chose to keep in the playlist (cover/duplicate-title collisions).</summary>
+    public int SkippedFiles { get; init; }
+
     public TimeSpan Duration { get; init; }
 
     /// <summary>Set when the operation was aborted by validation; null on success.</summary>

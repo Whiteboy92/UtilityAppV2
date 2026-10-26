@@ -10,6 +10,9 @@ public interface IDialogService
 
     void ShowInfo(string message, string title = "Information");
 
+    /// <summary>Shows a Yes/No prompt; returns true when the user chooses Yes.</summary>
+    bool Confirm(string message, string title = "Confirm");
+
     /// <summary>Shows a folder picker; returns the selected path or null if cancelled.</summary>
     string? PickFolder(string? title = null);
 }

@@ -89,4 +89,49 @@ public class ValidationHelperTests
 
         Assert.False(ValidationHelper.EnsureNoDuplicates(files, dest.Path, out _));
     }
+
+    [Fact]
+    public void FindCoverCollisions_FlagsSameTitleDifferentArtist()
+    {
+        using var dest = new TempDir();
+        dest.Touch("Hurt - Johnny Cash.mp3");
+        string incoming = @"C:\src\Hurt - Nine Inch Nails.mp3";
+
+        var collisions = ValidationHelper.FindCoverCollisions([incoming], dest.Path);
+
+        Assert.Single(collisions);
+        Assert.Equal(incoming, collisions[0].IncomingFile);
+        Assert.Equal("Hurt - Johnny Cash.mp3", collisions[0].ExistingFileName);
+    }
+
+    [Fact]
+    public void FindCoverCollisions_IgnoresExactSameNameAndArtist()
+    {
+        using var dest = new TempDir();
+        dest.Touch("Hurt - Johnny Cash.mp3");
+        // Same full name => an exact duplicate, handled by EnsureNoDuplicates, not here.
+        string incoming = @"C:\src\Hurt - Johnny Cash.mp3";
+
+        Assert.Empty(ValidationHelper.FindCoverCollisions([incoming], dest.Path));
+    }
+
+    [Fact]
+    public void FindCoverCollisions_TitleMatchIsCaseInsensitive()
+    {
+        using var dest = new TempDir();
+        dest.Touch("Hurt - Johnny Cash.mp3");
+        string incoming = @"C:\src\hurt - Nine Inch Nails.mp3";
+
+        Assert.Single(ValidationHelper.FindCoverCollisions([incoming], dest.Path));
+    }
+
+    [Fact]
+    public void FindCoverCollisions_EmptyWhenNoTitleMatch()
+    {
+        using var dest = new TempDir();
+        dest.Touch("Hurt - Johnny Cash.mp3");
+        string incoming = @"C:\src\Numb - Linkin Park.mp3";
+
+        Assert.Empty(ValidationHelper.FindCoverCollisions([incoming], dest.Path));
+    }
 }

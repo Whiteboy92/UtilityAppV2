@@ -1,4 +1,5 @@
 using System.IO;
+using UtilityAppV2.Models;
 
 namespace UtilityAppV2.Helpers
 {
@@ -97,6 +98,44 @@ namespace UtilityAppV2.Helpers
 
             error = message;
             return false;
+        }
+
+        /// <summary>
+        /// Finds incoming files whose song title already exists in the destination
+        /// under a different file name (a different artist — typically a cover).
+        /// Exact-name duplicates are handled by <see cref="EnsureNoDuplicates"/> and
+        /// are never reported here. The caller decides per file whether to move.
+        /// </summary>
+        public static IReadOnlyList<CoverCollision> FindCoverCollisions(
+            string[] files,
+            string destinationFolder)
+        {
+            // First existing file name per title is enough to show the user.
+            var existingByTitle = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var path in Directory.GetFiles(destinationFolder, "*.*", SearchOption.TopDirectoryOnly))
+            {
+                string name = Path.GetFileName(path);
+                string title = FileNameParser.SplitSongArtist(Path.GetFileNameWithoutExtension(name)).Song;
+                if (!string.IsNullOrWhiteSpace(title))
+                    existingByTitle.TryAdd(title, name);
+            }
+
+            var collisions = new List<CoverCollision>();
+            foreach (var incoming in files)
+            {
+                string incomingName = Path.GetFileName(incoming);
+                string title = FileNameParser.SplitSongArtist(Path.GetFileNameWithoutExtension(incomingName)).Song;
+                if (string.IsNullOrWhiteSpace(title))
+                    continue;
+
+                if (existingByTitle.TryGetValue(title, out var existingName)
+                    && !string.Equals(existingName, incomingName, StringComparison.OrdinalIgnoreCase))
+                {
+                    collisions.Add(new CoverCollision(incoming, existingName));
+                }
+            }
+
+            return collisions;
         }
     }
 }

@@ -13,7 +13,8 @@ namespace UtilityAppV2.Services.Implementation
 
         public async Task<FileMoveResult> MoveFilesAsync(
             IProgress<double>? progress,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            Func<CoverCollision, bool>? confirmCoverCollision = null)
         {
             var sourceFolder = FilePathConstants.PlaylistFolder;
             var destinationFolder = FilePathConstants.MusicDbFolder;
@@ -51,7 +52,41 @@ namespace UtilityAppV2.Services.Implementation
             if (!ValidationHelper.EnsureNoDuplicates(files, destinationFolder, out string? duplicateError))
                 return Aborted(totalFiles, startTime, duplicateError);
 
-            // 5. Move files (off the UI thread)
+            // 5. Same title, different artist (likely a cover): let the user decide
+            //    per file whether to move it or leave it in the playlist.
+            int skipped = 0;
+            if (confirmCoverCollision is not null)
+            {
+                var collisions = ValidationHelper.FindCoverCollisions(files, destinationFolder);
+                if (collisions.Count > 0)
+                {
+                    var keepInPlaylist = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var collision in collisions)
+                    {
+                        if (!confirmCoverCollision(collision))
+                            keepInPlaylist.Add(collision.IncomingFile);
+                    }
+
+                    if (keepInPlaylist.Count > 0)
+                    {
+                        files = files.Where(f => !keepInPlaylist.Contains(f)).ToArray();
+                        skipped = keepInPlaylist.Count;
+                    }
+                }
+            }
+
+            if (files.Length == 0)
+            {
+                return new FileMoveResult
+                {
+                    TotalFiles = totalFiles,
+                    MovedFiles = 0,
+                    SkippedFiles = skipped,
+                    Duration = DateTime.UtcNow - startTime,
+                };
+            }
+
+            // 6. Move files (off the UI thread)
             var (movedFiles, moveErrors) = await Task.Run(
                 () => MoveFilesCore(files, destinationFolder, progress, cancellationToken),
                 cancellationToken);
@@ -60,7 +95,7 @@ namespace UtilityAppV2.Services.Implementation
             // stale — drop it so the next scan picks up the newly added artists.
             artistRepository.InvalidateCache();
 
-            // 6. Re-tag the whole destination so track numbers stay unique and
+            // 7. Re-tag the whole destination so track numbers stay unique and
             //    sequential across the entire library (not just this batch).
             var destinationFiles = FileSystemHelper.GetAllFilesFromFolder(destinationFolder);
             var tagErrors = await TagProcessingHelper.ProcessTagsAsync(destinationFiles, cancellationToken);
@@ -69,6 +104,7 @@ namespace UtilityAppV2.Services.Implementation
             {
                 TotalFiles = totalFiles,
                 MovedFiles = movedFiles.Count,
+                SkippedFiles = skipped,
                 Duration = DateTime.UtcNow - startTime,
                 MoveErrors = moveErrors,
                 TagErrors = tagErrors,

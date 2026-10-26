@@ -26,6 +26,12 @@ public partial class App
 
         var mainWindow = serviceProvider.GetRequiredService<MainWindow>();
         mainWindow.Show();
+
+        // Fetch/refresh yt-dlp in the background so the first playlist download
+        // doesn't stall on a download and the binary stays current. Fire-and-forget:
+        // EnsureAndUpdateAsync swallows offline/transient failures.
+        var ytDlp = serviceProvider.GetRequiredService<IYtDlpProvider>();
+        _ = Task.Run(() => ytDlp.EnsureAndUpdateAsync());
     }
 
     protected override void OnExit(ExitEventArgs e)
@@ -40,6 +46,7 @@ public partial class App
         services.AddSingleton<ISettingsService, SettingsService>();
         services.AddSingleton<IDialogService, DialogService>();
         services.AddSingleton<IFileConversionService, FileConversionService>();
+        services.AddSingleton<IYtDlpProvider, YtDlpProvider>();
         services.AddSingleton<IDownloadService, DownloadService>();
         services.AddSingleton<IFileFixerService, FileFixerService>();
         services.AddSingleton<IRegexFileNameCleaner, RegexFileNameCleaner>();

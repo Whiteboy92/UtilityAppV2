@@ -69,7 +69,8 @@ namespace UtilityAppV2.ViewModels
                     Progress = Math.Max(0, Math.Min(100, value));
                 });
 
-                FileMoveResult result = await moveFilesService.MoveFilesAsync(progressReporter, cts.Token);
+                FileMoveResult result = await moveFilesService.MoveFilesAsync(
+                    progressReporter, cts.Token, ConfirmCoverCollision);
 
                 if (result.Aborted)
                 {
@@ -93,6 +94,10 @@ namespace UtilityAppV2.ViewModels
                         "Tag Update Warning");
                 }
 
+                string skippedLine = result.SkippedFiles > 0
+                    ? "\nKept in playlist (covers/duplicate titles): " + result.SkippedFiles
+                    : string.Empty;
+
                 if (result.MovedFiles > 0)
                 {
                     dialogService.ShowInfo(
@@ -100,7 +105,15 @@ namespace UtilityAppV2.ViewModels
                         "From: " + FilePathConstants.PlaylistFolder + "\n" +
                         "To: " + FilePathConstants.MusicDbFolder + "\n\n" +
                         "Total files: " + result.TotalFiles + "\n" +
-                        "Moved files: " + result.MovedFiles,
+                        "Moved files: " + result.MovedFiles +
+                        skippedLine,
+                        "Move Files");
+                }
+                else if (result.SkippedFiles > 0)
+                {
+                    dialogService.ShowInfo(
+                        "No files moved — all were kept in the playlist.\n" +
+                        "Covers/duplicate titles kept: " + result.SkippedFiles,
                         "Move Files");
                 }
                 else
@@ -123,6 +136,16 @@ namespace UtilityAppV2.ViewModels
                 cts = null;
             }
         }
+
+        private bool ConfirmCoverCollision(CoverCollision collision) =>
+            dialogService.Confirm(
+                "A song with this title is already in the library, under a different name " +
+                "(likely a different artist / cover):\n\n" +
+                "In library: " + collision.ExistingFileName + "\n" +
+                "Incoming:   " + System.IO.Path.GetFileName(collision.IncomingFile) + "\n\n" +
+                "Move the incoming file anyway?\n" +
+                "Yes = move it   |   No = keep it in the playlist",
+                "Possible Cover / Duplicate Title");
 
         private void CancelMove()
         {
